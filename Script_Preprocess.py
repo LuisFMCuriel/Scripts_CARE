@@ -15,6 +15,8 @@ from google.auth.transport.requests import Request
 from apiclient.http import MediaFileUpload
 from tifffile import imread, imsave
 import os
+import webbrowser
+import time
 import os.path
 from os import path
 import sys
@@ -59,6 +61,13 @@ def Register(filename,path_r,path_Ms,path_Ls,M_id,L_id,cont,S):
 	cont += CONT
 	return cont
 
+def Credentials():
+	if not os.path.isfile("credentials.json"):
+		webbrowser.open('https://developers.google.com/drive/api/v3/quickstart/python?authuser=2')
+		a = os.path.isfile("credentials.json")
+		while not a:
+			time.sleep(1)
+			a = os.path.isfile("credentials.json")
 
 def Authenticate():
 
@@ -90,7 +99,7 @@ def Drive_Directories(service):
     ################################################
     
     file_metadata = {
-    'name': 'Invoices', #This is the name of the folder 
+    'name': 'Care_2D', #This is the name of the folder 
     'mimeType': 'application/vnd.google-apps.folder'
     }
     Folder_Father = service.files().create(body=file_metadata,
@@ -158,6 +167,7 @@ L = "Low"
 M = "Max"
 createmydir(L)
 createmydir(M)
+Credentials()
 S = Authenticate() #Get credentials from API Cloud
 #Drive Directory part
 #We want that this path is created only once, so we need to keep a track of the Direcotrie's ID
