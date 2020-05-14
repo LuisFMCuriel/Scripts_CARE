@@ -44,15 +44,16 @@ def Register(filename,path_r,path_Ms,path_Ls,M_id,L_id,cont,S):
 	high[:,:,:] = a[:,pixels_h:c,:]
 	low_r[:,register:,:] = a[:,c:w-register,:]
 	low[:,:,:] = low_r[:,pixels_h:,:]
-	imsave(os.path.join(str(path_Ms),filename), high[:,:,:])
-	imsave(os.path.join(str(path_Ls),filename),low[:,:,:])
+	imsave(os.path.join(str(path_Ms),"P_" + filename), high[:,:,:])
+	imsave(os.path.join(str(path_Ls),"P_" + filename),low[:,:,:])
 	n,h,w = high.shape
 	for i in range(0,n):
 		#Save the ith image, upload it with a number in the name and delete it
 		#High exposure image
+		print(cont+i+1)
 		imsave(os.path.join(str(path_Ms),str(cont+i+1)+".tif"),high[i,:,:]) #Save it
 		Upload(S,M_id,os.path.join(str(path_Ms),str(cont+i+1)+".tif"), str(cont+i+1)+".tif") #Upload it
-		os.remove(os.path.join(str(path_Ms),str(cont+i+1)+".tif")) #Delete it 
+		os.remove(os.path.join(str(path_Ms),str(cont+i+1)+".tif")) #Delete it
 		#Low exposure image
 		imsave(os.path.join(str(path_Ls),str(cont+i+1)+".tif"),low[i,:,:]) #Save it
 		Upload(S,L_id,os.path.join(str(path_Ls),str(cont+i+1)+".tif"), str(cont+i+1)+".tif") #Upload it
@@ -134,7 +135,7 @@ def Upload(service,F_id, path, Name):
         'parents': [F_id]#[folder_id]
     }
     media = MediaFileUpload(path,
-                        mimetype='image/tif',
+                        mimetype='image/tif', chunksize = 5000000000,
                         resumable=True)
     file = service.files().create(body=file_metadata,
                                     media_body=media,
@@ -155,6 +156,8 @@ def Read_txt_cont(Name):
 	try:
 		with open(Name, 'r') as f: #If the file already exists
 			x = f.read()
+			if x == '':
+				x = 0
 	except: 
 		with open(Name, 'w') as f: #If the file does not exist
 			x = 0#f.read()
