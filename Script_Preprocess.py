@@ -6,7 +6,6 @@
 #!/bin/bash
 from __future__ import print_function
 import pickle
-import os.path
 get_ipython().system('pip install tifffile')
 get_ipython().system('pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib')
 from googleapiclient.discovery import build
@@ -17,37 +16,64 @@ from tifffile import imread, imsave
 import os
 import webbrowser
 import time
-import os.path
-from os import path
 import sys
 import numpy as np
 
+# Permission for the cloud
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/drive']
 
 
-def createmydir(new_path): #Create paths (windows os)
+def Create_my_dir(new_path): #Create paths (windows os)
+    """
+    Create a new directory
+
+    Parameters
+    ----------
+    new_path : (str) Path where the new dir is going to be created
+
+    Returns
+    -------
+    Void
+    """
     if not os.path.exists(new_path):
         os.makedirs(new_path);
 
 def Register(filename,path_r,path_Ms,path_Ls,M_id,L_id,cont,S):
-	CONT = 0;
+	"""
+    Register and upload images to Drive
+
+    Parameters
+    ----------
+    filename
+    filename : (str) name of the image to be processed
+	path_r : (str) Path where the images are going to be readed
+	path_Ms : (str) Path where the target images are 
+	path_Ls : (str) Path where the noisy images are
+	M_id : (str) ID of the folder in Drive where the target images are going to be saved
+	L_id : (str) ID of the folder in Drive where the noisy images are going to be saved
+	cont : (int) counter of the images uploaded
+	S : (str) credentials for the cloud services
+    Returns
+    -------
+    cont : (int) counter of the images uploaded
+    """
+	img_in_stack = 0;
 	print(os.path.join(path_r,filename))
-	a = imread(os.path.join(path_r,filename))
+	Image = imread(os.path.join(path_r,filename))
 	pixels_h = 24
-	n,h,w = a.shape
+	number,heigth,width = Image.shape
 	register = 8
-	c = int(h/2)
-	low_r = np.zeros((n,c,w),dtype=np.uint16)
-	low = np.zeros((n,c-pixels_h,w),dtype=np.uint16)
-	high = np.zeros((n,c-pixels_h,w),dtype=np.uint16)
-	high[:,:,:] = a[:,pixels_h:c,:]
-	low_r[:,register:,:] = a[:,c:w-register,:]
+	half_image = int(heigth/2)
+	low_r = np.zeros((number,half_image,width),dtype=np.uint16)
+	low = np.zeros((number,half_image-pixels_h,width),dtype=np.uint16)
+	high = np.zeros((number,half_image-pixels_h,width),dtype=np.uint16)
+	high[:,:,:] = Image[:,pixels_h:half_image,:]
+	low_r[:,register:,:] = Image[:,half_image:width-register,:]
 	low[:,:,:] = low_r[:,pixels_h:,:]
 	imsave(os.path.join(str(path_Ms),"P_" + filename), high[:,:,:])
 	imsave(os.path.join(str(path_Ls),"P_" + filename),low[:,:,:])
-	n,h,w = high.shape
-	for i in range(0,n):
+	for i in range(0,number):
 		#Save the ith image, upload it with a number in the name and delete it
 		#High exposure image
 		print(cont+i+1)
@@ -58,153 +84,233 @@ def Register(filename,path_r,path_Ms,path_Ls,M_id,L_id,cont,S):
 		imsave(os.path.join(str(path_Ls),str(cont+i+1)+".tif"),low[i,:,:]) #Save it
 		Upload(S,L_id,os.path.join(str(path_Ls),str(cont+i+1)+".tif"), str(cont+i+1)+".tif") #Upload it
 		os.remove(os.path.join(str(path_Ls),str(cont+i+1)+".tif")) #Delete it
-		CONT += 1
-	cont += CONT
+		img_in_stack += 1
+	cont += img_in_stack
 	return cont
 
-def Credentials():
+def Credentials(): 
+	"""
+    Generate the credentials.json, so the next time you upload images you don't have to authenticate
+
+    Parameters
+    ----------
+    void
+
+    Returns
+    -------
+    void
+    """
 	if not os.path.isfile("credentials.json"):
 		webbrowser.open('https://developers.google.com/drive/api/v3/quickstart/python?authuser=2')
-		a = os.path.isfile("credentials.json")
-		while not a:
+		credentials = os.path.isfile("credentials.json")
+		while not credentials:
 			time.sleep(1)
-			a = os.path.isfile("credentials.json")
+			credentials = os.path.isfile("credentials.json")
 
 def Authenticate():
+	"""
+    The file token.pickle stores the user's access and refresh tokens, and is
+    created automatically when the authorization flow completes for the first
+    time.
 
-    creds = None
-    # The file token.pickle stores the user's access and refresh tokens, and is
-    # created automatically when the authorization flow completes for the first
-    # time.
+    Parameters
+    ----------
+    void
+
+    Returns
+    -------
+    servide : (str) credentials for the cloud
+    """
+	creds = None
+
     #Authentication part
-    if os.path.exists('token.pickle'):
-        with open('token.pickle', 'rb') as token:
-            creds = pickle.load(token)
+	if os.path.exists('token.pickle'):
+		with open('token.pickle', 'rb') as token:
+			creds = pickle.load(token)
     # If there are no (valid) credentials available, let the user log in.
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
+	if not creds or not creds.valid:
+		if creds and creds.expired and creds.refresh_token:
+			creds.refresh(Request())
+		else:
+			flow = InstalledAppFlow.from_client_secrets_file(
                 'credentials.json', SCOPES)
-            creds = flow.run_local_server(port=0)
+			creds = flow.run_local_server(port=0)
         # Save the credentials for the next run
-        with open('token.pickle', 'wb') as token:
-            pickle.dump(creds, token)
+		with open('token.pickle', 'wb') as token:
+			pickle.dump(creds, token)
 
-    service = build('drive', 'v3', credentials=creds)
-    return service
+	service = build('drive', 'v3', credentials=creds)
+	return service
 
 def Drive_Directories(service):
-    #Creates directories
-    ################################################
-    
-    file_metadata = {
+	"""
+    Creates directories in cloud
+    Here we create 3 directories:
+    The first one is the father, which contains the other 2 folders (for target images and noisy images)
+
+    Parameters
+    ----------
+    service : (str) Credentials for the cloud
+
+    Returns
+    -------
+    servide : (str) credentials for the cloud
+    Folder_L.get('id') : (str) id noisy images directory
+    Folder_M.get('id') : (str) id target images directory
+    """
+
+	file_metadata = {
     'name': 'Care_2D', #This is the name of the folder 
     'mimeType': 'application/vnd.google-apps.folder'
     }
-    Folder_Father = service.files().create(body=file_metadata,
+	Folder_Father = service.files().create(body=file_metadata,
                                     fields='id').execute()
-    print('Folder ID: %s' % Folder_Father.get('id'))
-
-    file_metadata = {
+	print('Folder ID: %s' % Folder_Father.get('id'))
+    #The second folder is the folder which contains the noisy images
+	file_metadata = {
     'name': 'Low', #This is the name of the folder
     'parents': [Folder_Father.get('id')],
     'mimeType': 'application/vnd.google-apps.folder'
     }
-    Folder_L = service.files().create(body=file_metadata,
+	Folder_L = service.files().create(body=file_metadata,
                                     fields='id').execute()
-    print('Folder ID: %s' % Folder_L.get('id'))
+	print('Folder ID: %s' % Folder_L.get('id'))
 
-    file_metadata = {
+    #The third folder is the folder which contains the target images
+	file_metadata = {
     'name': 'Max', #This is the name of the folder
     'parents': [Folder_Father.get('id')],
     'mimeType': 'application/vnd.google-apps.folder'
     }
-    Folder_M = service.files().create(body=file_metadata,
+	Folder_M = service.files().create(body=file_metadata,
                                     fields='id').execute()
-    print('Folder ID: %s' % Folder_M.get('id'))
-
-    return service, Folder_L.get('id'), Folder_M.get('id')
+	print('Folder ID: %s' % Folder_M.get('id'))
+    #We return the id folders because we want to create them only once, so the next run
+	#we don't create them again
+	return service, Folder_L.get('id'), Folder_M.get('id')
 
 def Upload(service,F_id, path, Name):
-    #Upload files
-    ################################################
-    file_metadata = {
+	"""
+    Upload images
+
+    Parameters
+    ----------
+    service : (str) Credentials for the cloud
+    F_id : (str) ID of the directory where the image is going to be stored
+    path : (str) Where the image is located
+    Name : (str) The name you will use in the cloud for that file
+
+    Returns
+    -------
+    servide : (str) credentials for the cloud
+    Folder_L.get('id') : (str) id noisy images directory
+    Folder_M.get('id') : (str) id target images directory
+    """
+	file_metadata = {
       'name': Name,
-        'parents': [F_id]#[folder_id]
+        'parents': [F_id]#[folder_id] put them in the correct directory (depending on the folder ID)
     }
-    media = MediaFileUpload(path,
-                        mimetype='image/tif', chunksize = 5000000000,
+	media = MediaFileUpload(path,
+                        mimetype='image/tif', chunksize = 5000000000, #How much data you are going to upload?
                         resumable=True)
-    file = service.files().create(body=file_metadata,
+	file = service.files().create(body=file_metadata,
                                     media_body=media,
                                     fields='id').execute()
-    print ('File ID: %s' % file.get('id'))
+	print ('File ID: %s' % file.get('id'))
 
-def Read_txt_Image(Name): #To know which files have already been processed you write and read this files
+def Read_txt_Image(Name):
+	"""
+    Read .txt file (multiple rows of information)
+	This is to know which files have already been processed you write and read this files
+
+    Parameters
+    ----------
+    Name : (str) Name of the file
+
+    Returns
+    -------
+    x : (list) Contains the name of the images that you already uploaded
+    """
 	try:
 		with open(Name, 'r') as f: #If the file already exists
-			x = f.readlines()
+			x = f.readlines() #Readd all the rows and put them in a list
 	except: 
 		with open(Name, 'w') as f: #If the file does not exist
-			#x = f.read()
-			x = []
+			x = [] #Create an empty list
 	return x #This is the list that contains all the information for the file
 
 def Read_txt_cont(Name):
+	"""
+    Read .txt file (only one row of information)
+	This is where the cont variable are stored. This program stores the images with numbers as names: 1.tif, 2.tif
+	this is because the CARE program needs 2 images (target and noisy) to have the same name. The counter
+	stores the last number you uploaded in order to keep uploading to the same directory and avoid loss of information 
+
+    Parameters
+    ----------
+    Name : (str) Name of the file
+
+    Returns
+    -------
+    x : (int) Contains the number of the last image uploaded
+    """
 	try:
 		with open(Name, 'r') as f: #If the file already exists
-			x = f.read()
-			if x == '':
-				x = 0
+			x = f.read() #Read the file
+			if x == '': #If the file is empty
+				x = 0 #Start on 0
 	except: 
 		with open(Name, 'w') as f: #If the file does not exist
-			x = 0#f.read()
+			x = 0 #Start on 0
 	return x #This is the list that contains all the information for the file
 
-
-#Local Directory part
-R = sys.path[0] + r"\\" + "Images"
-L = "Low"
-M = "Max"
-createmydir(L)
-createmydir(M)
-Credentials()
-S = Authenticate() #Get credentials from API Cloud
-#Drive Directory part
-#We want that this path is created only once, so we need to keep a track of the Direcotrie's ID
-#If you delete handly the directory  in the cloud, please remove the file "ID.txt"
-if os.path.isfile("ID.txt"): #If the file already exists
-	with open("ID.txt", 'r') as f: 
-		x = f.readlines()
-	L_id = x[0]
-	L_id = L_id[:-1]
-	print(L_id)
-	M_id = x[1]
-	print(M_id)
-else: #If the file does not exist
-	S, L_id, M_id = Drive_Directories(S)
-	open("ID.txt", 'w').write(L_id + "\n")
-	open("ID.txt", 'a').write(M_id)
-#Read text cont
-Cont = Read_txt_cont("cont.txt");
-cont = int(Cont)
-#Read text Images
-List = Read_txt_Image("Images.txt")
-for filename in os.listdir(R): 
-	if os.path.isdir(filename): #If the file is a directory dont process it
-		continue
-	else: #If the file is not a directory then process it
-		Already_processed = filename + "\n" in List #Then we need to check if the file has alredy ben processed
-		if Already_processed: #If the file is alredy in the drive then don't do anythin
+def Main():
+	#Local Directory part
+	Base_dir = sys.path[0] + r"\\" + "Images"
+	Low_dir = "Low"
+	Max_dir = "Max"
+	Create_my_dir(Low_dir)
+	Create_my_dir(Max_dir)
+	Credentials()
+	cred = Authenticate() #Get credentials from API Cloud
+	#Drive Directory part
+	#We want that this path is created only once, so we need to keep a track of the Direcotrie's ID
+	#If you delete handly the directory  in the cloud, please remove the file "ID.txt"
+	if os.path.isfile("ID.txt"): #If the file already exists
+		with open("ID.txt", 'r') as f: 
+			x = f.readlines()
+		L_id = x[0]
+		L_id = L_id[:-1]
+		print(L_id)
+		M_id = x[1]
+		print(M_id)
+	else: #If the file does not exist
+		cred, L_id, M_id = Drive_Directories(cred)
+		open("ID.txt", 'w').write(L_id + "\n")
+		open("ID.txt", 'a').write(M_id)
+	#Read text cont
+	Cont = Read_txt_cont("cont.txt");
+	cont = int(Cont)
+	#Read text Images
+	List = Read_txt_Image("Images.txt")
+	for filename in os.listdir(Base_dir): 
+		if os.path.isdir(filename): #If the file is a directory dont process it
 			continue
-		else: #If not cut, register, detach and upload the images
-			cont = Register(filename, R, M, L, M_id, L_id, cont, S) #This is the counther for the name of the images
-			file = open("Images.txt", "a").write(filename + "\n") #Once you uploaded the file, take note of that image
+		else: #If the file is not a directory then process it
+			Already_processed = filename + "\n" in List #Then we need to check if the file has alredy ben processed
+			if Already_processed: #If the file is alredy in the drive then don't do anythin
+				continue
+			else: #If not cut, register, detach and upload the images
+				cont = Register(filename, Base_dir, Max_dir, Low_dir, M_id, L_id, cont, cred) #This is the counther for the name of the images
+				file = open("Images.txt", "a").write(filename + "\n") #Once you uploaded the file, take note of that image
 
-#After process the images update the information for the counter
-file = open("cont.txt","w").write(str(cont))
-#Uploading files
-#Upload(S,L_id,M_id,"1.tif")
+	#After process the images update the information for the counter
+	file = open("cont.txt","w").write(str(cont))
+
+
+
+
+
+#Start
+Main()
 
