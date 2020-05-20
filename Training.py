@@ -32,13 +32,14 @@ import csv
 
 print("Depencies installed and imported.")
 
-def Show_loss_function(history):
+def Show_loss_function(history,model_path):
   '''
   Plot the loss function
 
   Parameters
   ----------
   history : keras object
+  model_path : (str) path to the model
 
   Return
   ----------
@@ -88,6 +89,95 @@ def Show_patches(X,Y):
   plt.suptitle('5 example validation patches (top row: source, bottom row: target)');
 
 
+def Predict_a_image(Training_source,Training_target,model_path,model_training):
+  '''
+  Predict a random image for a quick reference of the model
+
+  Parameters
+  ----------
+  Training_source : (str) Path to the noisy images
+  Training_target : (str) Path to the GT images
+  model_path : (str) Path to the model
+  model_trainin: (keras model) load the model to make a prediction
+
+  Returns
+  -------
+  void
+  '''
+  # This will display a randomly chosen dataset input and output
+  random_choice = random.choice(os.listdir(Training_source))
+  x = imread(Training_source+"/"+random_choice)
+
+  os.chdir(Training_target)
+  y = imread(Training_target+"/"+random_choice)
+
+  f=plt.figure(figsize=(16,8))
+  plt.subplot(1,2,1)
+  plt.imshow(x, interpolation='nearest')
+  plt.title('Training source')
+  plt.axis('off');
+
+  plt.subplot(1,2,2)
+  plt.imshow(y, interpolation='nearest')
+  plt.title('Training target')
+  plt.axis('off');
+  
+  #Create a temporary file folder for immediate assessment of training results:
+  #If the folder still exists, delete it
+  if os.path.exists(Training_source+"/temp"):
+    shutil.rmtree(Training_source+"/temp")
+
+  if os.path.exists(Training_target+"/temp"):
+    shutil.rmtree(Training_target+"/temp")
+
+  if os.path.exists(model_path+"/temp"):
+    shutil.rmtree(model_path+"/temp")
+
+#Create directories to move files temporarily into for assessment
+  os.makedirs(Training_source+"/temp")
+  os.makedirs(Training_target+"/temp")
+  os.makedirs(model_path+"/temp")
+#Move files into the temporary source and target directories:
+  shutil.move(Training_source+"/"+random_choice, Training_source+'/temp/'+random_choice)
+  shutil.move(Training_target+"/"+random_choice, Training_target+'/temp/'+random_choice)
+
+#Here we predict one image
+  validation_image = imread(Training_source+"/temp/"+random_choice)
+  validation_test = model_training.predict(validation_image, axes='YX')
+  os.chdir(model_path+"/temp/")
+  imsave(random_choice+"_predicted.tif",validation_test)
+#Source
+  I = imread(Training_source+"/temp/"+random_choice)
+#Target
+  J = imread(Training_target+"/temp/"+random_choice)
+#Prediction
+  K = imread(model_path+"/temp/"+random_choice+"_predicted.tif")
+#Make a plot
+  f=plt.figure(figsize=(24,12))
+  plt.subplot(1,3,1)
+  plt.imshow(I, interpolation='nearest')
+  plt.title('Source')
+  plt.axis('off');
+
+  plt.subplot(1,3,2)
+  plt.imshow(J, interpolation='nearest')
+  plt.title('Target')
+  plt.axis('off');
+
+  plt.subplot(1,3,3)
+  plt.imshow(K, interpolation='nearest')
+  plt.title('Prediction')
+  plt.axis('off');
+
+#Move the temporary files back to their original folders
+  shutil.move(Training_source+'/temp/'+random_choice, Training_source+"/"+random_choice)
+  shutil.move(Training_target+'/temp/'+random_choice, Training_target+"/"+random_choice)
+
+#Delete the temporary folder
+  shutil.rmtree(Training_target+'/temp')
+  shutil.rmtree(Training_source+'/temp')
+
+
 def train( Training_source = ".",
                 Training_target = ".",
                 model_name = "No_name",
@@ -100,6 +190,28 @@ def train( Training_source = ".",
                 number_of_steps =  300,
                 batch_size =  32,
                 percentage_validation =  15):
+  '''
+  Main function of the script. Train the model an save in model_path
+
+  Parameters
+  ----------
+  Training_source : (str) Path to the noisy images
+  Training_target : (str) Path to the GT images
+  model_name : (str) name of the model
+  model_path : (str) path of the model
+  Visual_validation_after_training : (bool) Predict a random image after training
+  Number_of_epochs : (int) epochs
+  path_size : (int) patch sizes
+  number_of_patches : (int) number of patches for each image
+  User_Default_Advances_Parameters : (bool) Use default parameters for the training
+  number_of_steps : (int) number of steps
+  batch_size : (int) batch size
+  percentage_validation : (int) percentage validation
+
+  Return
+  -------
+  void
+  '''
   OutputFile = Training_target+"/*.tif"
   InputFile = Training_source+"/*.tif"
   base = "/content/"
@@ -122,51 +234,6 @@ def train( Training_source = ".",
   print('Loaded Output images (number, width, length) =', y.shape)
   print("Parameters initiated.")
 
-  # This will display a randomly chosen dataset input and output
-  random_choice = random.choice(os.listdir(Training_source))
-  x = imread(Training_source+"/"+random_choice)
-
-  os.chdir(Training_target)
-  y = imread(Training_target+"/"+random_choice)
-
-  f=plt.figure(figsize=(16,8))
-  plt.subplot(1,2,1)
-  plt.imshow(x, interpolation='nearest')
-  plt.title('Training source')
-  plt.axis('off');
-
-  plt.subplot(1,2,2)
-  plt.imshow(y, interpolation='nearest')
-  plt.title('Training target')
-  plt.axis('off');
-
-  #protection for next cell
-  if (Visual_validation_after_training):
-    Cell_executed = 0
-
-  if (Visual_validation_after_training):
-    if Cell_executed == 0 :
-
-  #Create a temporary file folder for immediate assessment of training results:
-  #If the folder still exists, delete it
-      if os.path.exists(Training_source+"/temp"):
-        shutil.rmtree(Training_source+"/temp")
-
-      if os.path.exists(Training_target+"/temp"):
-        shutil.rmtree(Training_target+"/temp")
-
-      if os.path.exists(model_path+"/temp"):
-        shutil.rmtree(model_path+"/temp")
-
-  #Create directories to move files temporarily into for assessment
-      os.makedirs(Training_source+"/temp")
-      os.makedirs(Training_target+"/temp")
-      os.makedirs(model_path+"/temp")
-      #list_source = os.listdir(os.path.join(Training_source))
-      #list_target = os.listdir(os.path.join(Training_target))
-  #Move files into the temporary source and target directories:
-      shutil.move(Training_source+"/"+random_choice, Training_source+'/temp/'+random_choice)
-      shutil.move(Training_target+"/"+random_choice, Training_target+'/temp/'+random_choice)
 
   # RawData Object
 
@@ -227,49 +294,8 @@ def train( Training_source = ".",
   history = model_training.train(X,Y, validation_data=(X_val,Y_val))
 
   print("Training, done.")
-
-def Predict_a_image:
   if (Visual_validation_after_training):
-    if Cell_executed == 1:
-  #Here we predict one image
-      validation_image = imread(Training_source+"/temp/"+random_choice)
-      validation_test = model_training.predict(validation_image, axes='YX')
-      os.chdir(model_path+"/temp/")
-      imsave(random_choice+"_predicted.tif",validation_test)
-  #Source
-      I = imread(Training_source+"/temp/"+random_choice)
-  #Target
-      J = imread(Training_target+"/temp/"+random_choice)
-  #Prediction
-      K = imread(model_path+"/temp/"+random_choice+"_predicted.tif")
-  #Make a plot
-      f=plt.figure(figsize=(24,12))
-      plt.subplot(1,3,1)
-      plt.imshow(I, interpolation='nearest')
-      plt.title('Source')
-      plt.axis('off');
-
-      plt.subplot(1,3,2)
-      plt.imshow(J, interpolation='nearest')
-      plt.title('Target')
-      plt.axis('off');
-
-      plt.subplot(1,3,3)
-      plt.imshow(K, interpolation='nearest')
-      plt.title('Prediction')
-      plt.axis('off');
-
-  #Move the temporary files back to their original folders
-      shutil.move(Training_source+'/temp/'+random_choice, Training_source+"/"+random_choice)
-      shutil.move(Training_target+'/temp/'+random_choice, Training_target+"/"+random_choice)
-
-  #Delete the temporary folder
-      shutil.rmtree(Training_target+'/temp')
-      shutil.rmtree(Training_source+'/temp')
-
-  #protection against removing data
-    Cell_executed = 0
-
+    Predict_a_image(Training_source,Training_target,model_path,model_training)
 
   # Displaying the time elapsed for training
   dt = time.time() - start
@@ -277,7 +303,7 @@ def Predict_a_image:
   hour, min = divmod(min, 60) 
   print("Time elapsed:",hour, "hour(s)",min,"min(s)",round(sec),"sec(s)")
 
-  #Show_loss_function(history)
+  Show_loss_function(history,model_path)
   
 
 
