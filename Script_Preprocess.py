@@ -7,12 +7,14 @@
 from __future__ import print_function
 import pickle
 get_ipython().system('pip install tifffile')
+get_ipython().system('pip install imreg')
 get_ipython().system('pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib')
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from apiclient.http import MediaFileUpload
 from tifffile import imread, imsave
+from imreg import translation
 import os
 import webbrowser
 import time
@@ -61,15 +63,16 @@ def Register(filename,path_r,path_Ms,path_Ls,M_id,L_id,cont,S):
 	img_in_stack = 0;
 	print(os.path.join(path_r,filename))
 	Image = imread(os.path.join(path_r,filename))
-	pixels_h = 24
-	number,heigth,width = Image.shape
-	register = 8
-	half_image = int(heigth/2)
-	low_r = np.zeros((number,half_image,width),dtype=np.uint16)
-	low = np.zeros((number,half_image-pixels_h,width),dtype=np.uint16)
-	high = np.zeros((number,half_image-pixels_h,width),dtype=np.uint16)
+	pixels_h = 10
+	number,height,widht = Image.shape
+	half_image = int(height/2)
+	register, t1 = translation(Image[0,pixels_h:half_image,:], Image[0,pixels_h+half_image:,:]) #Compare the first frame of the stack and find registration number
+	print(register)
+	low_r = np.zeros((number,half_image,widht),dtype=np.uint16)
+	low = np.zeros((number,half_image-pixels_h,widht),dtype=np.uint16)
+	high = np.zeros((number,half_image-pixels_h,widht),dtype=np.uint16)
 	high[:,:,:] = Image[:,pixels_h:half_image,:]
-	low_r[:,register:,:] = Image[:,half_image:width-register,:]
+	low_r[:,register:,:] = Image[:,half_image:-register,:]
 	low[:,:,:] = low_r[:,pixels_h:,:]
 	imsave(os.path.join(str(path_Ms),"P_" + filename), high[:,:,:])
 	imsave(os.path.join(str(path_Ls),"P_" + filename),low[:,:,:])
@@ -142,7 +145,7 @@ def Authenticate():
 	service = build('drive', 'v3', credentials=creds)
 	return service
 
-def Drive_Directories(service):
+def Drive_Directories(service,Ans_name):
 	"""
     Creates directories in cloud
     Here we create 3 directories:
@@ -160,7 +163,7 @@ def Drive_Directories(service):
     """
 
 	file_metadata = {
-    'name': 'Care_2D', #This is the name of the folder 
+    'name': Ans_name, #This is the name of the folder 
     'mimeType': 'application/vnd.google-apps.folder'
     }
 	Folder_Father = service.files().create(body=file_metadata,
@@ -285,7 +288,9 @@ def Main():
 		M_id = x[1]
 		print(M_id)
 	else: #If the file does not exist
-		cred, L_id, M_id = Drive_Directories(cred)
+		print("What name would you like to use for your main dir?")
+		Ans = input()
+		cred, L_id, M_id = Drive_Directories(cred,Ans)
 		open("ID.txt", 'w').write(L_id + "\n")
 		open("ID.txt", 'a').write(M_id)
 	#Read text cont
