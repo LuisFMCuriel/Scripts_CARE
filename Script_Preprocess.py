@@ -63,7 +63,7 @@ def Register(filename,path_r,path_Ms,path_Ls,M_id,L_id,cont,S):
 	img_in_stack = 0;
 	print(os.path.join(path_r,filename))
 	Image = imread(os.path.join(path_r,filename))
-	pixels_h = 10
+	pixels_h = 24
 	number,height,widht = Image.shape
 	half_image = int(height/2)
 	register, t1 = translation(Image[0,pixels_h:half_image,:], Image[0,pixels_h+half_image:,:]) #Compare the first frame of the stack and find registration number
@@ -71,9 +71,19 @@ def Register(filename,path_r,path_Ms,path_Ls,M_id,L_id,cont,S):
 	low_r = np.zeros((number,half_image,widht),dtype=np.uint16)
 	low = np.zeros((number,half_image-pixels_h,widht),dtype=np.uint16)
 	high = np.zeros((number,half_image-pixels_h,widht),dtype=np.uint16)
+	high_r = np.zeros((number,half_image,widht), dtype=np.uint16)
 	high[:,:,:] = Image[:,pixels_h:half_image,:]
-	low_r[:,register:,:] = Image[:,half_image:-register,:]
-	low[:,:,:] = low_r[:,pixels_h:,:]
+	low[:,:,:] = Image[:,half_image+pixels_h:,:]
+	print(Image[:,half_image:,:].shape)
+	if register == 0:
+		low_r[:,register:,:] = Image[:,half_image:,:]
+		low[:,:,:] = low_r[:,pixels_h:,:]
+	elif register < 0:
+		high_r[:,-register:,:] = Image[:,-register:half_image,:]
+		high[:,:,:] = high_r[:,pixels_h:,:]
+	else:
+		low_r[:,register:,:] = Image[:,half_image:-register,:]
+		low[:,:,:] = low_r[:,pixels_h:,:]
 	imsave(os.path.join(str(path_Ms),"P_" + filename), high[:,:,:])
 	imsave(os.path.join(str(path_Ls),"P_" + filename),low[:,:,:])
 	for i in range(0,number):
@@ -214,7 +224,7 @@ def Upload(service,F_id, path, Name):
         'parents': [F_id]#[folder_id] put them in the correct directory (depending on the folder ID)
     }
 	media = MediaFileUpload(path,
-                        mimetype='image/tif', chunksize = 5000000000, #How much data you are going to upload?
+                        mimetype='image/tif', chunksize = 5000000000000, #How much data you are going to upload?
                         resumable=True)
 	file = service.files().create(body=file_metadata,
                                     media_body=media,
@@ -309,8 +319,8 @@ def Main():
 				cont = Register(filename, Base_dir, Max_dir, Low_dir, M_id, L_id, cont, cred) #This is the counther for the name of the images
 				file = open("Images.txt", "a").write(filename + "\n") #Once you uploaded the file, take note of that image
 
-	#After process the images update the information for the counter
-	file = open("cont.txt","w").write(str(cont))
+		#After process the images update the information for the counter
+		file = open("cont.txt","w").write(str(cont))
 
 
 
