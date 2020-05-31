@@ -279,7 +279,7 @@ def Read_txt_cont(Name):
 
 def Main():
 	#Local Directory part
-	Base_dir = sys.path[0] + r"\\" + "Images"
+	Base_dir = os.path.join(sys.path[0],"Images")# + r"\\" + "Images"
 	Low_dir = "Low"
 	Max_dir = "Max"
 	Create_my_dir(Low_dir)
